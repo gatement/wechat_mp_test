@@ -16,7 +16,8 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
-import net.johnsonlau.wechatmptest.dto.GetPageAccessTokenResp;
+import net.johnsonlau.wechatmptest.dto.WechatPageAccessToken;
+import net.johnsonlau.wechatmptest.dto.WechatUserInfo;
 
 @RestController
 @Slf4j
@@ -32,30 +33,47 @@ public class PagesController {
 	public String snsapiBase(@RequestParam String state, @RequestParam String code,
 			@Value("${app.app-id}") String appId, @Value("${app.app-secret}") String appSecret,
 			@Value("${app.wechat.url.get-page-access-token}") String url) {
-		GetPageAccessTokenResp getPageAccessTokenResp = null;
+		WechatPageAccessToken pageAccessToken = null;
 		try {
-			getPageAccessTokenResp = getPageAccessToken(code, appId, appSecret, url);
-		} catch (JsonParseException e) {
-			log.error(e.toString());
-			return "snsapi_base page: get page access_token error.";
-		} catch (JsonMappingException e) {
-			log.error(e.toString());
-			return "snsapi_base page: get page access_token error.";
-		} catch (IOException e) {
+			pageAccessToken = getPageAccessToken(code, appId, appSecret, url);
+		} catch (Exception e) {
 			log.error(e.toString());
 			return "snsapi_base page: get page access_token error.";
 		}
-		log.info("/pages/snsapi_base: {}", getPageAccessTokenResp);
-		return "snsapi_base page: openid=" + getPageAccessTokenResp.getOpenid();
+		log.info("/pages/snsapi_base: pageAccessToken={}", pageAccessToken);
+		return "snsapi_base page: openid=" + pageAccessToken.getOpenid();
 	}
 
 	@GetMapping("/snsapi_userinfo")
-	public String snsapiUserinfo(@RequestParam String state, @RequestParam String code) {
-		log.info("snsapi_userinfo, state={}, code={}", state, code);
-		return "snsapi_userinfo page";
+	public String snsapiUserinfo(@RequestParam String state, @RequestParam String code,
+			@Value("${app.app-id}") String appId, @Value("${app.app-secret}") String appSecret,
+			@Value("${app.wechat.url.get-page-access-token}") String getPageAccessTokenUrl,
+			@Value("${app.wechat.url.get-user-info}") String getUserInfoUrl) {
+
+		WechatPageAccessToken pageAccessToken = null;
+		try {
+			pageAccessToken = getPageAccessToken(code, appId, appSecret, getPageAccessTokenUrl);
+		} catch (Exception e) {
+			log.error(e.toString());
+			return "snsapi_userinfo page: get page access_token error.";
+		}
+
+		log.info("/pages/snsapi_userinfo: pageAccessToken={}", pageAccessToken);
+
+		WechatUserInfo userInfo = null;
+		try {
+			String openid = pageAccessToken.getOpenid();
+			String accessToken = pageAccessToken.getAccessToken();
+			userInfo = getUserInfo(accessToken, openid, getUserInfoUrl);
+		} catch (Exception e) {
+			log.error(e.toString());
+			return "snsapi_userinfo page: get userInfo error.";
+		}
+		log.info("/pages/snsapi_userinfo: userInfo={}", userInfo);
+		return "snsapi_userinfo page: nickname=" + userInfo.getNickname();
 	}
 
-	private GetPageAccessTokenResp getPageAccessToken(String code, String appId, String appSecret, String url)
+	private WechatPageAccessToken getPageAccessToken(String code, String appId, String appSecret, String url)
 			throws JsonParseException, JsonMappingException, IOException {
 		Map<String, String> urlVariables = new HashMap<String, String>();
 		urlVariables.put("appid", appId);
@@ -63,6 +81,16 @@ public class PagesController {
 		urlVariables.put("code", code);
 		String resultStr = new RestTemplate().getForObject(url, String.class, urlVariables);
 		ObjectMapper objectMapper = new ObjectMapper();
-		return objectMapper.readValue(resultStr, GetPageAccessTokenResp.class);
+		return objectMapper.readValue(resultStr, WechatPageAccessToken.class);
+	}
+
+	private WechatUserInfo getUserInfo(String accessToken, String openid, String url)
+			throws JsonParseException, JsonMappingException, IOException {
+		Map<String, String> urlVariables = new HashMap<String, String>();
+		urlVariables.put("access_token", accessToken);
+		urlVariables.put("openid", openid);
+		String resultStr = new RestTemplate().getForObject(url, String.class, urlVariables);
+		ObjectMapper objectMapper = new ObjectMapper();
+		return objectMapper.readValue(resultStr, WechatUserInfo.class);
 	}
 }
