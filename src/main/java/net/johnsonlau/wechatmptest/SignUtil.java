@@ -10,11 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class SignUtil {
-	private static String TOKEN = "123456";
-
-	public static boolean checkSignature(String signature, String timestamp, String nonce) {
+	public static boolean checkSignature(String signature, String timestamp, String nonce, String token) {
 		// 将token、timestamp、nonce三个参数进行字典序排序
-		String[] arr = new String[] { TOKEN, timestamp, nonce };
+		String[] arr = new String[] { token, timestamp, nonce };
 		String content = Arrays.stream(arr).sorted().collect(Collectors.joining());
 
 		MessageDigest md = null;
